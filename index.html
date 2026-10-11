@@ -1323,6 +1323,7 @@ var req;
 try{
 req=indexedDB.open('gdwasm_saves',1);
 }catch(e){
+gdSaveBusy=false;
 say('[persist] cannot open save database: '+e);
 return;
 }
