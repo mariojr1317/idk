@@ -1425,7 +1425,7 @@ addFile(path,knownSaves[i]);
 /* Also check a nested AppData folder, if the build uses one. */
 try{
 if(fs.analyzePath('/Resources/AppData').exists)
-walk('/Resources/AppData','AppData');
+walk('/Resources/AppData','Resources/AppData');
 }catch(e){
 say('[persist] cannot scan /Resources/AppData: '+e);
 }
@@ -1877,7 +1877,7 @@ if(g.result&&g.result.byteLength){
 var s=String(k);
 
 var base=
-s.indexOf('AppData/')===0
+(s.indexOf('AppData/')===0||s.indexOf('Resources/')===0)
 ?'/'
 :'/Resources/';
 
