@@ -1358,64 +1358,80 @@ function gdCollectSaveFiles(){
 
 var fs=Module&&Module.FS;
 var files=[];
+var seen={};
 
 if(!fs||!fs.readdir||!fs.stat||!fs.readFile)
 return files;
 
-function walk(dir,relative){
-var names;
-
-try{
-names=fs.readdir(dir);
-}catch(e){
-return;
-}
-
-for(var i=0;i<names.length;i++){
-var name=names[i];
-
-if(name==='.'||name==='..')
-continue;
-
-var path=dir==='/'?'/'+name:dir+'/'+name;
-var rel=relative?relative+'/'+name:name;
-var stat;
-
-try{
-stat=fs.stat(path);
-}catch(e){
-continue;
-}
-
-if((stat.mode&0xF000)===0x4000){
-walk(path,rel);
-continue;
-}
-
+function addFile(path,key){
+if(seen[key])return;
 try{
 var bytes=fs.readFile(path,{encoding:'binary'});
-
 if(!(bytes instanceof Uint8Array))
 bytes=new Uint8Array(bytes);
-
-if(bytes.byteLength){
+if(!bytes.byteLength)return;
 var copy=bytes.buffer.slice(
 bytes.byteOffset,
 bytes.byteOffset+bytes.byteLength
 );
-files.push({key:rel,data:copy});
-}
+files.push({key:key,data:copy});
+seen[key]=true;
 }catch(e){
 say('[persist] could not read '+path+': '+e);
 }
 }
+
+function walk(dir,relative){
+var names;
+try{names=fs.readdir(dir);}catch(e){return;}
+for(var i=0;i<names.length;i++){
+var name=names[i];
+if(name==='.'||name==='..')continue;
+var path=dir==='/'?'/'+name:dir+'/'+name;
+var rel=relative?relative+'/'+name:name;
+var stat;
+try{stat=fs.stat(path);}catch(e){continue;}
+if((stat.mode&0xF000)===0x4000){
+walk(path,rel);
+continue;
+}
+addFile(path,rel);
+}
 }
 
+/* Emscripten builds may store user data in either location. */
 try{
 if(fs.analyzePath('/AppData').exists)
 walk('/AppData','AppData');
-}catch(e){}
+}catch(e){
+say('[persist] cannot scan /AppData: '+e);
+}
 
+/* Geometry Dash save files may be written beside the game resources. */
+var knownSaves=[
+'CCGameManager.dat',
+'CCLocalLevels.dat',
+'CCGameStats.dat',
+'CCLocalLevels2.dat'
+];
+for(var i=0;i<knownSaves.length;i++){
+var path='/Resources/'+knownSaves[i];
+try{
+if(fs.analyzePath(path).exists)
+addFile(path,knownSaves[i]);
+}catch(e){}
+}
+
+/* Also check a nested AppData folder, if the build uses one. */
+try{
+if(fs.analyzePath('/Resources/AppData').exists)
+walk('/Resources/AppData','AppData');
+}catch(e){
+say('[persist] cannot scan /Resources/AppData: '+e);
+}
+
+say('[persist] discovered '+files.length+' candidate save file(s)'+
+(files.length?': '+files.map(function(f){return f.key;}).join(', '):''));
 return files;
 }
 
