@@ -1308,6 +1308,163 @@ setProgress(100);
 
 var gdSaveTimer=null;
 var gdLastSave=0;
+var gdSaveDb=null;
+var gdSaveBusy=false;
+
+function gdOpenSaveDb(done){
+
+if(gdSaveDb){
+done(gdSaveDb);
+return;
+}
+
+var req;
+
+try{
+req=indexedDB.open('gdwasm_saves',1);
+}catch(e){
+say('[persist] cannot open save database: '+e);
+return;
+}
+
+req.onupgradeneeded=function(){
+var db=req.result;
+if(!db.objectStoreNames.contains('files'))
+db.createObjectStore('files');
+};
+
+req.onerror=function(){
+say('[persist] save database open failed: '+req.error);
+};
+
+req.onblocked=function(){
+say('[persist] save database is blocked by another connection');
+};
+
+req.onsuccess=function(){
+gdSaveDb=req.result;
+gdSaveDb.onversionchange=function(){
+gdSaveDb.close();
+gdSaveDb=null;
+};
+done(gdSaveDb);
+};
+}
+
+function gdCollectSaveFiles(){
+
+var fs=Module&&Module.FS;
+var files=[];
+
+if(!fs||!fs.readdir||!fs.stat||!fs.readFile)
+return files;
+
+function walk(dir,relative){
+var names;
+
+try{
+names=fs.readdir(dir);
+}catch(e){
+return;
+}
+
+for(var i=0;i<names.length;i++){
+var name=names[i];
+
+if(name==='.'||name==='..')
+continue;
+
+var path=dir==='/'?'/'+name:dir+'/'+name;
+var rel=relative?relative+'/'+name:name;
+var stat;
+
+try{
+stat=fs.stat(path);
+}catch(e){
+continue;
+}
+
+if((stat.mode&0xF000)===0x4000){
+walk(path,rel);
+continue;
+}
+
+try{
+var bytes=fs.readFile(path,{encoding:'binary'});
+
+if(!(bytes instanceof Uint8Array))
+bytes=new Uint8Array(bytes);
+
+if(bytes.byteLength){
+var copy=bytes.buffer.slice(
+bytes.byteOffset,
+bytes.byteOffset+bytes.byteLength
+);
+files.push({key:rel,data:copy});
+}
+}catch(e){
+say('[persist] could not read '+path+': '+e);
+}
+}
+}
+
+try{
+if(fs.analyzePath('/AppData').exists)
+walk('/AppData','AppData');
+}catch(e){}
+
+return files;
+}
+
+function gdPersistSaves(){
+
+if(!window.__gdRuntimeReady||gdSaveBusy)
+return;
+
+var files=gdCollectSaveFiles();
+
+if(!files.length){
+say('[persist] no AppData save files found yet');
+return;
+}
+
+gdSaveBusy=true;
+
+gdOpenSaveDb(function(db){
+
+var tx;
+
+try{
+tx=db.transaction('files','readwrite');
+var store=tx.objectStore('files');
+
+/* Clear and rewrite in one transaction, so a reload cannot leave a half-written save set. */
+store.clear();
+
+for(var i=0;i<files.length;i++)
+store.put(files[i].data,files[i].key);
+
+tx.oncomplete=function(){
+gdSaveBusy=false;
+say('[persist] saved '+files.length+' file(s) to IndexedDB');
+};
+
+tx.onerror=function(){
+gdSaveBusy=false;
+say('[persist] IndexedDB save failed: '+tx.error);
+};
+
+tx.onabort=function(){
+gdSaveBusy=false;
+say('[persist] IndexedDB save transaction aborted');
+};
+
+}catch(e){
+gdSaveBusy=false;
+say('[persist] could not write saves: '+e);
+}
+});
+}
 
 function scheduleSave(now){
 
@@ -1321,19 +1478,22 @@ gdSaveTimer=setTimeout(function(){
 
 gdSaveTimer=null;
 
-if(!now&&Date.now()-gdLastSave<180000)
+if(!now&&Date.now()-gdLastSave<5000)
 return;
 
 gdLastSave=Date.now();
 
 try{
-
 if(Module._gd_request_save)
 Module._gd_request_save();
+}catch(e){
+say('[persist] game save request failed: '+e);
+}
 
-}catch(e){}
+/* Give the game a moment to flush its own save files before copying them to IndexedDB. */
+setTimeout(gdPersistSaves,300);
 
-},now?0:4000);
+},now?0:500);
 }
 
 document.addEventListener(
@@ -1343,6 +1503,16 @@ if(document.hidden)
 scheduleSave(true);
 }
 );
+
+window.addEventListener('pagehide',function(){
+scheduleSave(true);
+});
+
+/* Periodic persistence protects against closing or reloading before a final page event. */
+setInterval(function(){
+if(window.__gdRuntimeReady)
+scheduleSave(false);
+},10000);
 
 function gdProgressTick(){
 
