@@ -720,6 +720,13 @@ onerror="this.parentElement.textContent='LOADING…';this.remove()">
 
 var consoleEl=document.getElementById('console');
 
+/* Always-visible save diagnostics, independent of the animated debug console. */
+var persistStatus=document.createElement('div');
+persistStatus.id='persistStatus';
+persistStatus.style.cssText='position:fixed!important;left:8px!important;right:8px!important;bottom:8px!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;transform:none!important;max-height:26vh!important;overflow:auto!important;padding:8px 10px!important;background:rgba(0,0,0,.94)!important;color:#fff!important;border:2px solid #ffcc33!important;border-radius:6px!important;font:12px/1.4 monospace!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;pointer-events:auto!important;';
+persistStatus.textContent='[persist] diagnóstico iniciado; esperando que cargue el juego…';
+document.body.appendChild(persistStatus);
+
 try{
 Error.stackTraceLimit=400;
 }catch(e){}
@@ -805,9 +812,19 @@ return false;
 
 function say(s){
 
-if(!GD_DEBUG)return;
-
 var str=String(s);
+
+/* Save diagnostics must remain visible even when full debug logging is off. */
+if(str.indexOf('[persist]')===0){
+var line=document.createElement('div');
+line.textContent=str;
+persistStatus.appendChild(line);
+while(persistStatus.childNodes.length>12)
+persistStatus.removeChild(persistStatus.firstChild);
+persistStatus.scrollTop=persistStatus.scrollHeight;
+}
+
+if(!GD_DEBUG)return;
 
 if(!isQuiet(str))
 console.log(s);
@@ -2119,6 +2136,7 @@ setProgress(76);
 onRuntimeInitialized:function(){
 
 window.__gdRuntimeReady=true;
+say('[persist] motor del juego iniciado; comprobando los datos guardados');
 
 if(
 !GD_DEBUG&&
