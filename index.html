@@ -733,6 +733,13 @@ console.log=console.info=console.debug=function(){};
 }catch(e){}
 
 consoleEl.style.display='none';
+
+}else{
+/* Keep the debug console visible; the default CSS transform otherwise hides it. */
+consoleEl.style.display='block';
+consoleEl.style.transform='translateY(0)';
+consoleEl.style.position='relative';
+consoleEl.style.zIndex='20';
 }
 
 var logQueue=[];
