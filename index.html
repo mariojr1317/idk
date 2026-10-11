@@ -1334,10 +1334,12 @@ db.createObjectStore('files');
 };
 
 req.onerror=function(){
+gdSaveBusy=false;
 say('[persist] save database open failed: '+req.error);
 };
 
 req.onblocked=function(){
+gdSaveBusy=false;
 say('[persist] save database is blocked by another connection');
 };
 
