@@ -723,9 +723,25 @@ var consoleEl=document.getElementById('console');
 /* Always-visible save diagnostics, independent of the animated debug console. */
 var persistStatus=document.createElement('div');
 persistStatus.id='persistStatus';
-persistStatus.style.cssText='position:fixed!important;left:8px!important;right:8px!important;bottom:8px!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;transform:none!important;max-height:26vh!important;overflow:auto!important;padding:8px 10px!important;background:rgba(0,0,0,.94)!important;color:#fff!important;border:2px solid #ffcc33!important;border-radius:6px!important;font:12px/1.4 monospace!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;pointer-events:auto!important;';
+persistStatus.style.cssText='position:fixed!important;left:8px!important;right:8px!important;bottom:48px!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;transform:none!important;max-height:26vh!important;overflow:auto!important;padding:8px 10px!important;background:rgba(0,0,0,.94)!important;color:#fff!important;border:2px solid #ffcc33!important;border-radius:6px!important;font:12px/1.4 monospace!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;pointer-events:auto!important;';
 persistStatus.textContent='[persist] diagnóstico iniciado; esperando que cargue el juego…';
 document.body.appendChild(persistStatus);
+
+/* Persistent toggle button: hide the diagnostic panel without stopping logging. */
+var persistToggle=document.createElement('button');
+persistToggle.id='persistToggle';
+persistToggle.type='button';
+persistToggle.textContent='Ocultar diagnóstico';
+persistToggle.setAttribute('aria-controls','persistStatus');
+persistToggle.setAttribute('aria-expanded','true');
+persistToggle.style.cssText='position:fixed!important;right:8px!important;bottom:8px!important;z-index:2147483647!important;padding:8px 12px!important;border:1px solid #ffcc33!important;border-radius:6px!important;background:#222!important;color:#fff!important;font:12px/1.2 sans-serif!important;cursor:pointer!important;pointer-events:auto!important;';
+persistToggle.addEventListener('click',function(){
+var hidden=persistStatus.style.display==='none';
+persistStatus.style.display=hidden?'block':'none';
+persistToggle.textContent=hidden?'Ocultar diagnóstico':'Mostrar diagnóstico';
+persistToggle.setAttribute('aria-expanded',hidden?'true':'false');
+});
+document.body.appendChild(persistToggle);
 
 try{
 Error.stackTraceLimit=400;
