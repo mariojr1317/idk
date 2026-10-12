@@ -166,6 +166,10 @@ throw err;
 window.fetch=function(input,init){
 
 var u=(typeof input==="string")?input:(input&&input.url);
+try{
+  if(window.__gdNetNote && /boomlings|GJSearch|GJGetLevel|database|__proxy|corsfix|corsproxy|allorigins/i.test(String(u||'')))
+    window.__gdNetNote('fetch '+String(u).slice(0,190));
+}catch(e){}
 var target=window.__gdProxyTarget(u);
 
 if(target===null)
@@ -208,6 +212,10 @@ var nativeSend=XMLHttpRequest.prototype.send;
 var nativeSetHeader=XMLHttpRequest.prototype.setRequestHeader;
 
 XMLHttpRequest.prototype.open=function(method,url){
+try{
+  if(window.__gdNetNote && /boomlings|GJSearch|GJGetLevel|database|__proxy|corsfix|corsproxy|allorigins/i.test(String(url||'')))
+    window.__gdNetNote('XHR '+String(method)+' '+String(url).slice(0,190));
+}catch(e){}
 this.__gdReq={method:method,url:url,args:Array.prototype.slice.call(arguments),target:null,form:false,attempt:0,headers:[],body:null,retrying:false};
 if(typeof url==="string"){
 var target=window.__gdProxyTarget(url);
