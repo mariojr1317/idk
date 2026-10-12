@@ -1455,7 +1455,7 @@ say('[persist] cannot scan /Resources/AppData: '+e);
 }
 
 say('[persist] discovered '+files.length+' candidate save file(s)'+
-(files.length?': '+files.map(function(f){return f.key;}).join(', '):''));
+(files.length?': '+files.map(function(f){return f.key+' ('+f.data.byteLength+' B)';}).join(', '):''));
 return files;
 }
 
@@ -1527,8 +1527,12 @@ return;
 gdLastSave=Date.now();
 
 try{
-if(Module._gd_request_save)
+if(typeof Module._gd_request_save==='function'){
 Module._gd_request_save();
+say('[persist] solicitud de guardado del juego enviada');
+}else{
+say('[persist] AVISO: Module._gd_request_save no está disponible; depende del autoguardado interno');
+}
 }catch(e){
 say('[persist] game save request failed: '+e);
 }
