@@ -16,7 +16,7 @@ try{
 var q=new URLSearchParams(location.search).get("proxy");
 if(q){
 try{localStorage.setItem("gdProxyBase",q);}catch(e){}
-return[q];
+return[q].concat(d.filter(function(x){return x!==q;}));
 }
 var s=localStorage.getItem("gdProxyBase");
 if(s)return[s].concat(d.filter(function(x){return x!==s;}));
