@@ -16,7 +16,7 @@ try{
 var q=new URLSearchParams(location.search).get("proxy");
 if(q){
 try{localStorage.setItem("gdProxyBase",q);}catch(e){}
-return[q].concat(d.filter(function(x){return x!==q;}));
+return[q];
 }
 var s=localStorage.getItem("gdProxyBase");
 if(s)return[s].concat(d.filter(function(x){return x!==s;}));
@@ -137,15 +137,6 @@ var out=(typeof input==="string")
 :((typeof Request!=="undefined")?new Request(url,input):url);
 
 return nativeFetch(out,init).then(function(res){
-try{
-  if(/GJSearchLevels|GJGetLevel|GJGetLevels/i.test(target)){
-    res.clone().text().then(function(t){
-      window.__gdNetNote(res.status+' '+target.replace(/^https?:\\/\\//,'').slice(0,100)+' :: '+String(t).replace(/[\\r\\n]+/g,' ').slice(0,100));
-    }).catch(function(){});
-  }else if(/boomlings\\.com|\\/database\\//i.test(target)){
-    window.__gdNetNote(res.status+' '+target.replace(/^https?:\\/\\//,'').slice(0,140));
-  }
-}catch(e){}
 
 if(retryable(res.status)&&idx<window.__gdProxyBases.length-1)
 return attempt(input,init,target,form,idx+1);
@@ -166,10 +157,6 @@ throw err;
 window.fetch=function(input,init){
 
 var u=(typeof input==="string")?input:(input&&input.url);
-try{
-  if(window.__gdNetNote && /boomlings|GJSearch|GJGetLevel|database|__proxy|corsfix|corsproxy|allorigins/i.test(String(u||'')))
-    window.__gdNetNote('fetch '+String(u).slice(0,190));
-}catch(e){}
 var target=window.__gdProxyTarget(u);
 
 if(target===null)
@@ -208,91 +195,26 @@ return rest();
 };
 
 var nativeOpen=XMLHttpRequest.prototype.open;
-var nativeSend=XMLHttpRequest.prototype.send;
-var nativeSetHeader=XMLHttpRequest.prototype.setRequestHeader;
 
 XMLHttpRequest.prototype.open=function(method,url){
-try{
-  if(window.__gdNetNote && /boomlings|GJSearch|GJGetLevel|database|__proxy|corsfix|corsproxy|allorigins/i.test(String(url||'')))
-    window.__gdNetNote('XHR '+String(method)+' '+String(url).slice(0,190));
-}catch(e){}
-this.__gdReq={method:method,url:url,args:Array.prototype.slice.call(arguments),target:null,form:false,attempt:0,headers:[],body:null,retrying:false};
+
 if(typeof url==="string"){
+
 var target=window.__gdProxyTarget(url);
+
 if(target!==null){
-this.__gdReq.target=target;
-this.__gdReq.form=url.indexOf("/__proxy?url=")>=0;
-if(!(this.__gdReq.form&&window.__gdProxyLocal!==false)){
-var base=window.__gdProxyBases[0];
-arguments[1]=window.__gdProxyBuild(base,target);
-this.__gdReq.attempt=0;
+
+var form=url.indexOf("/__proxy?url=")>=0;
+
+if(!(form&&window.__gdProxyLocal!==false))
+arguments[1]=window.__gdProxyBuild(
+window.__gdProxyBase||window.__gdProxyBases[0],
+target
+);
 }
 }
-}
+
 return nativeOpen.apply(this,arguments);
-};
-
-XMLHttpRequest.prototype.setRequestHeader=function(name,value){
-if(this.__gdReq)this.__gdReq.headers.push([name,value]);
-return nativeSetHeader.apply(this,arguments);
-};
-
-XMLHttpRequest.prototype.send=function(body){
-var xhr=this,req=this.__gdReq;
-if(!req||!req.target||req.target===null)return nativeSend.apply(this,arguments);
-req.body=body;
-if(!this.__gdRetryHook){
-this.__gdRetryHook=true;
-this.addEventListener("load",function(ev){
-var q=xhr.__gdReq;
-if(!q||!q.target||q.retrying)return;
-var st=xhr.status;
-try{
-  var u=String(q.target||'');
-  if(/GJSearchLevels|GJGetLevel|GJGetLevels/i.test(u)){
-    var body='';
-    try{body=String(xhr.responseText||'').replace(/[\r\n]+/g,' ').slice(0,100);}catch(e){}
-    window.__gdNetNote((st||'status?')+' '+u.replace(/^https?:\/\//,'').slice(0,115)+' :: '+body);
-  }else if(/boomlings\.com|\/database\//i.test(u)){
-    window.__gdNetNote((st||'status?')+' '+u.replace(/^https?:\/\//,'').slice(0,150));
-  }
-}catch(e){}
-var retry=(st===400||st===403||st===404||st===408||st===429||st===500||st===502||st===503||st===504);
-if(st===404&&q.form)window.__gdProxyLocal=false;
-if(!retry||q.attempt>=window.__gdProxyBases.length-1)return;
-if(/(^|&)(gjp2?|password)=/.test(typeof q.body==="string"?q.body:""))return;
-ev.stopImmediatePropagation();
-q.retrying=true;
-q.attempt++;
-window.__gdProxyBase=window.__gdProxyBases[q.attempt];
-try{
-nativeOpen.call(xhr,q.method,window.__gdProxyBuild(window.__gdProxyBases[q.attempt],q.target),q.args.length>2?q.args[2]:true);
-q.headers.forEach(function(h){nativeSetHeader.call(xhr,h[0],h[1]);});
-q.retrying=false;
-nativeSend.call(xhr,q.body);
-}catch(e){
-q.retrying=false;
-}
-},true);
-this.addEventListener("error",function(ev){
-var q=xhr.__gdReq;
-if(!q||!q.target||q.retrying||q.attempt>=window.__gdProxyBases.length-1)return;
-if(/(^|&)(gjp2?|password)=/.test(typeof q.body==="string"?q.body:""))return;
-ev.stopImmediatePropagation();
-q.retrying=true;
-q.attempt++;
-window.__gdProxyBase=window.__gdProxyBases[q.attempt];
-try{
-nativeOpen.call(xhr,q.method,window.__gdProxyBuild(window.__gdProxyBases[q.attempt],q.target),q.args.length>2?q.args[2]:true);
-q.headers.forEach(function(h){nativeSetHeader.call(xhr,h[0],h[1]);});
-q.retrying=false;
-nativeSend.call(xhr,q.body);
-}catch(e){
-q.retrying=false;
-}
-},true);
-}
-return nativeSend.apply(this,arguments);
 };
 })();
 </script>
@@ -804,18 +726,6 @@ persistStatus.id='persistStatus';
 persistStatus.style.cssText='position:fixed!important;left:8px!important;right:8px!important;bottom:48px!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;transform:none!important;max-height:26vh!important;overflow:auto!important;padding:8px 10px!important;background:rgba(0,0,0,.94)!important;color:#fff!important;border:2px solid #ffcc33!important;border-radius:6px!important;font:12px/1.4 monospace!important;white-space:pre-wrap!important;overflow-wrap:anywhere!important;pointer-events:auto!important;';
 persistStatus.textContent='[persist] diagnóstico iniciado; esperando que cargue el juego…';
 document.body.appendChild(persistStatus);
-
-window.__gdNetNote=function(message){
-  try{
-    var line=document.createElement('div');
-    line.textContent='[net] '+String(message).slice(0,260);
-    line.style.color='#8ee7ff';
-    persistStatus.appendChild(line);
-    while(persistStatus.childNodes.length>12)
-      persistStatus.removeChild(persistStatus.firstChild);
-    persistStatus.scrollTop=persistStatus.scrollHeight;
-  }catch(e){}
-};
 
 /* Persistent toggle button: hide the diagnostic panel without stopping logging. */
 var persistToggle=document.createElement('button');
@@ -1587,9 +1497,7 @@ try{
 tx=db.transaction('files','readwrite');
 var store=tx.objectStore('files');
 
-/* Clear and rewrite in one transaction, so a reload cannot leave a half-written save set. */
-store.clear();
-
+/* Update only discovered files. A partial scan must never erase older saves. */
 for(var i=0;i<files.length;i++)
 store.put(files[i].data,files[i].key);
 
@@ -1917,73 +1825,58 @@ e.reason
 
 function restoreSaves(then){
 
-var called=false;
+var finished=false;
+var saveDbForRestore=null;
 
 function finish(){
-
-if(!called){
-
-called=true;
+if(finished)return;
+finished=true;
+try{if(saveDbForRestore)saveDbForRestore.close();}catch(e){}
 then();
-
 }
-}
-
-setTimeout(finish,3000);
 
 try{
-
-var req=indexedDB.open(
-'gdwasm_saves',
-1
-);
+var req=indexedDB.open('gdwasm_saves',1);
 
 req.onupgradeneeded=function(){
-req.result.createObjectStore('files');
+var db=req.result;
+if(!db.objectStoreNames.contains('files'))
+db.createObjectStore('files');
 };
 
 req.onerror=function(){
-
-say('[persist] idb open failed');
-
+say('[persist] no se pudo abrir la base de datos; el juego continuará sin restaurar');
 finish();
 };
 
-req.onsuccess=function(){
+req.onblocked=function(){
+say('[persist] la base de datos está bloqueada por otra pestaña');
+};
 
-var store,keysReq;
+req.onsuccess=function(){
+saveDbForRestore=req.result;
+var tx,store,keysReq;
 
 try{
-
-store=req.result
-.transaction('files','readonly')
-.objectStore('files');
-
+tx=saveDbForRestore.transaction('files','readonly');
+store=tx.objectStore('files');
 keysReq=store.getAllKeys();
-
 }catch(e){
-
+say('[persist] no se pudieron leer las partidas: '+e);
 finish();
 return;
 }
 
-keysReq.onerror=finish;
+keysReq.onerror=function(){
+say('[persist] error al leer las claves guardadas');
+finish();
+};
 
 keysReq.onsuccess=function(){
-
 var keys=keysReq.result||[];
-
-say(
-'[persist] restore: '+
-keys.length+
-' file(s) in DB'+
-(keys.length
-?': '+keys.join(', ')
-:'')
-);
+say('[persist] restauración: '+keys.length+' archivo(s) guardados');
 
 if(!keys.length){
-
 finish();
 return;
 }
@@ -1991,79 +1884,70 @@ return;
 var pending=keys.length;
 
 function one(){
-
-if(--pending===0)
-finish();
+pending--;
+if(pending===0)finish();
 }
 
 keys.forEach(function(k){
-
-var g=store.get(k);
-
-g.onerror=one;
-
-g.onsuccess=function(){
-
-try{
-
-if(g.result&&g.result.byteLength){
-
-var s=String(k);
-
-var base=
-(s.indexOf('AppData/')===0||s.indexOf('Resources/')===0)
-?'/'
-:'/Resources/';
-
-var parts=s.split('/');
-var cur=base.replace(/\/$/,'');
-
-for(
-var pi=0;
-pi<parts.length-1;
-pi++
-){
-
-cur+='/'+parts[pi];
-
-try{
-Module.FS.stat(cur);
-}catch(e2){
-Module.FS.mkdir(cur);
-}
+var g;
+try{g=store.get(k);}catch(e){
+say('[persist] no se pudo solicitar '+k+': '+e);
+one();
+return;
 }
 
-Module.FS.writeFile(
-base+s,
-new Uint8Array(g.result)
-);
-
-say(
-'[persist] restored '+
-s+
-' ('+
-g.result.byteLength+
-' bytes)'
-);
-}
-
-}catch(e){
-
-say(
-'[persist] restore '+
-k+
-': '+e
-);
-}
-
+g.onerror=function(){
+say('[persist] no se pudo leer '+k);
 one();
 };
 
+g.onsuccess=function(){
+try{
+var value=g.result;
+if(value===undefined||value===null)return;
+
+var bytes;
+if(value instanceof ArrayBuffer)bytes=new Uint8Array(value);
+else if(ArrayBuffer.isView(value))bytes=new Uint8Array(value.buffer,value.byteOffset,value.byteLength);
+else if(Array.isArray(value))bytes=new Uint8Array(value);
+else{
+say('[persist] formato desconocido para '+k);
+return;
+}
+
+var s=String(k).replace(/^\\/+/, '');
+var path=(s.indexOf('AppData/')===0||s.indexOf('Resources/')===0)
+?'/'+s
+:'/Resources/'+s;
+
+var parts=path.split('/').filter(Boolean);
+var cur='';
+for(var pi=0;pi<parts.length-1;pi++){
+cur+='/'+parts[pi];
+try{Module.FS.stat(cur);}
+catch(e2){
+try{Module.FS.mkdir(cur);}
+catch(e3){
+try{
+if(!Module.FS.analyzePath(cur).exists)throw e3;
+}catch(e4){throw e3;}
+}
+}
+}
+
+Module.FS.writeFile(path,bytes);
+say('[persist] restaurado '+s+' ('+bytes.byteLength+' bytes)');
+}catch(e){
+say('[persist] error al restaurar '+k+': '+e);
+}finally{
+one();
+}
+};
 });
 };
 };
-
 }catch(e){
+say('[persist] error al iniciar la restauración: '+e);
 finish();
 }
 }
