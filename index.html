@@ -195,26 +195,76 @@ return rest();
 };
 
 var nativeOpen=XMLHttpRequest.prototype.open;
+var nativeSend=XMLHttpRequest.prototype.send;
+var nativeSetHeader=XMLHttpRequest.prototype.setRequestHeader;
 
 XMLHttpRequest.prototype.open=function(method,url){
-
+this.__gdReq={method:method,url:url,args:Array.prototype.slice.call(arguments),target:null,form:false,attempt:0,headers:[],body:null,retrying:false};
 if(typeof url==="string"){
-
 var target=window.__gdProxyTarget(url);
-
 if(target!==null){
-
-var form=url.indexOf("/__proxy?url=")>=0;
-
-if(!(form&&window.__gdProxyLocal!==false))
-arguments[1]=window.__gdProxyBuild(
-window.__gdProxyBase||window.__gdProxyBases[0],
-target
-);
+this.__gdReq.target=target;
+this.__gdReq.form=url.indexOf("/__proxy?url=")>=0;
+if(!(this.__gdReq.form&&window.__gdProxyLocal!==false)){
+var base=window.__gdProxyBases[0];
+arguments[1]=window.__gdProxyBuild(base,target);
+this.__gdReq.attempt=0;
 }
 }
-
+}
 return nativeOpen.apply(this,arguments);
+};
+
+XMLHttpRequest.prototype.setRequestHeader=function(name,value){
+if(this.__gdReq)this.__gdReq.headers.push([name,value]);
+return nativeSetHeader.apply(this,arguments);
+};
+
+XMLHttpRequest.prototype.send=function(body){
+var xhr=this,req=this.__gdReq;
+if(!req||!req.target||req.target===null)return nativeSend.apply(this,arguments);
+req.body=body;
+if(!this.__gdRetryHook){
+this.__gdRetryHook=true;
+this.addEventListener("load",function(ev){
+var q=xhr.__gdReq;
+if(!q||!q.target||q.retrying)return;
+var st=xhr.status;
+var retry=(st===400||st===403||st===408||st===429||st===500||st===502||st===503||st===504);
+if(!retry||q.attempt>=window.__gdProxyBases.length-1)return;
+if(/(^|&)(gjp2?|password)=/.test(typeof q.body==="string"?q.body:""))return;
+ev.stopImmediatePropagation();
+q.retrying=true;
+q.attempt++;
+window.__gdProxyBase=window.__gdProxyBases[q.attempt];
+try{
+nativeOpen.call(xhr,q.method,window.__gdProxyBuild(window.__gdProxyBases[q.attempt],q.target),q.args.length>2?q.args[2]:true);
+q.headers.forEach(function(h){nativeSetHeader.call(xhr,h[0],h[1]);});
+q.retrying=false;
+nativeSend.call(xhr,q.body);
+}catch(e){
+q.retrying=false;
+}
+},true);
+this.addEventListener("error",function(ev){
+var q=xhr.__gdReq;
+if(!q||!q.target||q.retrying||q.attempt>=window.__gdProxyBases.length-1)return;
+if(/(^|&)(gjp2?|password)=/.test(typeof q.body==="string"?q.body:""))return;
+ev.stopImmediatePropagation();
+q.retrying=true;
+q.attempt++;
+window.__gdProxyBase=window.__gdProxyBases[q.attempt];
+try{
+nativeOpen.call(xhr,q.method,window.__gdProxyBuild(window.__gdProxyBases[q.attempt],q.target),q.args.length>2?q.args[2]:true);
+q.headers.forEach(function(h){nativeSetHeader.call(xhr,h[0],h[1]);});
+q.retrying=false;
+nativeSend.call(xhr,q.body);
+}catch(e){
+q.retrying=false;
+}
+},true);
+}
+return nativeSend.apply(this,arguments);
 };
 })();
 </script>
